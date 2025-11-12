@@ -35,5 +35,8 @@ function getRoomUsers(room: string): User[] {
   return users.filter((user) => user.room === room);
 }
 
-export { userJoin, getCurrentUser, userLeave, getRoomUsers };
+function resetUsers(): void {
+  users.length = 0;
+}
 
+export { userJoin, getCurrentUser, userLeave, getRoomUsers, resetUsers };
