@@ -69,22 +69,27 @@ export const createChatServer = (options: ChatServerOptions = {}) => {
     res.json({ message: 'Chat API is running on ' + portLabel });
   });
 
+  //socket.io user connections
   io.on('connection', (socket) => {
     console.log('connection: User connected:', socket.id);
 
+    //socket.io room events connections
     socket.on('joinRoom', async ({ room }) => {
       if (!room) {
         socket.emit('error', { message: 'Room are required' });
         return;
       }
 
+      // random username unique generation for anonymous users
       const username = uniqueNamesGenerator({
         dictionaries: [adjectives, colors, animals],
       });
 
+      // save users to local memory in place of redux
       const user = userJoin(socket.id, username, room);
       console.log('joinRoom: User joined room:', JSON.stringify(user));
 
+      // Socket.io Room: added user to socket.io room
       socket.join(user.room);
 
       socket.emit(
@@ -92,6 +97,7 @@ export const createChatServer = (options: ChatServerOptions = {}) => {
         formatMessage(botName, 'Welcome to Espresso Chat!')
       );
 
+      // Mongoose Database: Load last 50 messages from room
       try {
         const messages = await messageService.getRecentMessages(user.room);
         messages
@@ -108,6 +114,7 @@ export const createChatServer = (options: ChatServerOptions = {}) => {
         console.log('Error loading messages:', error);
       }
 
+      // broadcast message to socket.io room that user joined
       socket.broadcast
         .to(user.room)
         .emit(
@@ -115,12 +122,14 @@ export const createChatServer = (options: ChatServerOptions = {}) => {
           formatMessage(botName, `${user.username} has joined the chat.`)
         );
 
+      // Socket.io Room: Update room users list
       io.to(user.room).emit('roomUsers', {
         room: user.room,
         users: getRoomUsers(user.room),
       });
     });
 
+    // socket.io Chat Message Events
     socket.on('chatMessage', async (msg) => {
       const user = getCurrentUser(socket.id);
 
@@ -129,10 +138,17 @@ export const createChatServer = (options: ChatServerOptions = {}) => {
         return;
       }
 
-      console.log('chatMessage:', JSON.stringify(user));
+      console.log(
+        'chatMessage:',
+        `${formatMessage(user.username, msg).time} ${JSON.stringify(
+          user
+        )}: ${msg}`
+      );
 
+      // Emit message to all users in the room
       io.to(user.room).emit('message', formatMessage(user.username, msg));
 
+      // Save message to database
       try {
         await messageService.saveMessage({
           roomId: user.room,
@@ -144,6 +160,7 @@ export const createChatServer = (options: ChatServerOptions = {}) => {
       }
     });
 
+    // socket.io user Disconnect Events
     socket.on('disconnect', () => {
       const user = userLeave(socket.id);
 
@@ -166,6 +183,7 @@ export const createChatServer = (options: ChatServerOptions = {}) => {
   return { app, httpServer, io };
 };
 
+// Database Integration: Default implementation of MessageService using Mongoose
 const createDefaultMessageService = (): MessageService => ({
   async getRecentMessages(roomId: string) {
     return Message.find({ roomId }).sort({ timestamp: -1 }).limit(50).exec();

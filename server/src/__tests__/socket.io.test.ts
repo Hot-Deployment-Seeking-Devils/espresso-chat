@@ -12,6 +12,7 @@ describe('Socket.IO chat server', () => {
   let messageService: InMemoryMessageService;
   let closeServer: () => Promise<void>;
 
+  // builds and starts a new chat server instance from chatServer.ts for testing
   const createServer = async () => {
     messageService = new InMemoryMessageService();
     const { httpServer } = createChatServer({
@@ -19,6 +20,11 @@ describe('Socket.IO chat server', () => {
       corsOrigin: '*',
       portLabel: 'test',
     });
+
+    // Initialize like onCreate();
+    // Starts a HTTP server on any free ort and watches for errors. Upon error takes off the error listener.
+    // Checks for any start up errors
+    // Unregister the temp error listener so later errors don't trigger its rejection.
 
     await new Promise<void>((resolve, reject) => {
       const onError = (error: Error) => reject(error);
@@ -30,6 +36,7 @@ describe('Socket.IO chat server', () => {
       });
     });
 
+    // closes the server async
     closeServer = () =>
       new Promise<void>((resolve, reject) => {
         httpServer.close((error) => {
@@ -41,7 +48,7 @@ describe('Socket.IO chat server', () => {
         });
       });
   };
-
+  // builds a new socket io client that turns off automatic reconnection
   const createClient = async () => {
     const socket = Client(`http://127.0.0.1:${port}`, {
       transports: ['websocket'],
@@ -65,7 +72,9 @@ describe('Socket.IO chat server', () => {
         (socket) =>
           new Promise<void>((resolve) => {
             if (socket.connected) {
+              //remove listener
               socket.once('disconnect', () => resolve());
+              // terminate connection
               socket.disconnect();
             } else {
               resolve();
@@ -77,10 +86,13 @@ describe('Socket.IO chat server', () => {
   };
 
   const joinRoomAndWait = async (socket: Socket) => {
+    // listening to event message once
     const welcomePromise = waitForEvent<{
       username: string;
       text: string;
     }>(socket, 'message');
+
+    // listening to event roomUsers once
     const rosterPromise = waitForEvent<{
       room: string;
       users: Array<{ room: string }>;
@@ -88,15 +100,21 @@ describe('Socket.IO chat server', () => {
 
     socket.emit('joinRoom', { room });
 
-    const [welcome, roster] = await Promise.all([welcomePromise, rosterPromise]);
+    const [welcome, roster] = await Promise.all([
+      welcomePromise,
+      rosterPromise,
+    ]);
 
     return { welcome, roster };
   };
 
+  // TESTS SETUP AND TEARDOWN:
+  // before each test, create a new server
   beforeEach(async () => {
     await createServer();
   });
 
+  // after each test, close all clients and the server
   afterEach(async () => {
     await cleanupClients();
     if (closeServer) {
@@ -118,7 +136,9 @@ describe('Socket.IO chat server', () => {
     expect(roster.users[0].room).toBe(room);
   });
 
+  // JOIN BROADCAST TEST
   test('notifies existing members when someone joins the room', async () => {
+    // set up client listeners
     const firstClient = await createClient();
     await joinRoomAndWait(firstClient);
 
@@ -133,6 +153,8 @@ describe('Socket.IO chat server', () => {
 
     await joinRoomAndWait(secondClient);
 
+    // Tests:
+    // verify first client received join broadcast and updated roster
     const joinBroadcast = await joinBroadcastPromise;
     expect(joinBroadcast.text).toContain('has joined the chat.');
 
@@ -141,6 +163,7 @@ describe('Socket.IO chat server', () => {
     updatedRoster.users.forEach((user) => expect(user.room).toBe(room));
   });
 
+  // CHAT MESSAGE TEST
   test('broadcasts chat messages and persists via message service', async () => {
     const sender = await createClient();
     await joinRoomAndWait(sender);
@@ -160,6 +183,7 @@ describe('Socket.IO chat server', () => {
 
     sender.emit('chatMessage', text);
 
+    // resolved received message
     const payload = await received;
     expect(payload.text).toBe(text);
     expect(payload.username).not.toBe('Espresso Bot');
@@ -179,10 +203,7 @@ describe('Socket.IO chat server', () => {
     await joinNotice;
     await joinRoster;
 
-    const leaveMessage = waitForEvent<{ text: string }>(
-      firstClient,
-      'message'
-    );
+    const leaveMessage = waitForEvent<{ text: string }>(firstClient, 'message');
     const rosterUpdate = waitForEvent<{ users: Array<unknown> }>(
       firstClient,
       'roomUsers'
