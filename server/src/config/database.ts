@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 export const connectDB = async () => {
   const MONGO_URI =
+    process.env.MONGODB_URI ||
     'mongodb+srv://jonathanlindev_db_user:479oE9t8kyyH11Ty@cluster0.oszcix0.mongodb.net/?appName=Cluster0';
   //      process.env.MONGODB_URI || 'mongodb://localhost:27017/espresso-chat';
 
