@@ -9,7 +9,7 @@ export const connectDB = async () => {
   await mongoose
     .connect(MONGO_URI, {
       // sets the name of the DB that our collections are part of
-      dbName: 'art-img-reference',
+      dbName: 'espresso-chat',
     })
     .then(() => console.log('Connected to Mongo DB.'))
     .catch((error) => {
