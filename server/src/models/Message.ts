@@ -28,4 +28,3 @@ const MessageSchema: Schema = new Schema({
 });
 
 export default mongoose.model<IMessage>('Message', MessageSchema);
-
