@@ -25,7 +25,10 @@ const ChatRoom = () => {
 
   // auto scroll to bottom when new message comes in
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const el = messagesEndRef.current;
+  if (el && typeof el.scrollIntoView === "function") {
+    el.scrollIntoView({ behavior: "smooth" });
+  }
   };
 
   useEffect(() => {
